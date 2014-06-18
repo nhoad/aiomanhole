@@ -40,10 +40,12 @@ class StatefulCommandCompiler(CommandCompiler):
 
 
 class InteractiveInterpreter:
-    def __init__(self, namespace, banner):
+    def __init__(self, namespace, banner, loop, command_timeout):
         self.namespace = namespace
         self.banner = banner if isinstance(banner, bytes) else banner.encode('utf8')
         self.compiler = StatefulCommandCompiler()
+        self.loop = loop
+        self.command_timeout = command_timeout
 
     def attempt_compile(self, line):
         try:
@@ -60,12 +62,17 @@ class InteractiveInterpreter:
 
         yield from self.writer.drain()
 
+    @asyncio.coroutine
     def attempt_exec(self, codeobj, namespace):
-        exc = None
         with contextlib.redirect_stdout(StringIO()) as buf:
-            value = eval(codeobj, namespace)
+            value = yield from self._real_exec(codeobj, namespace)
 
         return value, buf.getvalue()
+
+    @asyncio.coroutine
+    def _real_exec(self, codeobj, namespace):
+        yield  # quick hack to pretend to be a coroutine, which attempt_exec expects
+        return eval(codeobj, namespace)
 
     @asyncio.coroutine
     def handle_one_command(self, namespace):
@@ -94,7 +101,7 @@ class InteractiveInterpreter:
                 continue
             else:
                 try:
-                    value, stdout = self.attempt_exec(codeobj, namespace)
+                    value, stdout = yield from self.attempt_exec(codeobj, namespace)
                 except Exception:
                     yield from self.send_exception()
                     continue
@@ -131,11 +138,29 @@ class InteractiveInterpreter:
                 traceback.print_exc()
 
 
-def start_manhole(banner=None, host='127.0.0.1', port=None, path=None, namespace=None):
+class ThreadedInteractiveInterpreter(InteractiveInterpreter):
+    def _real_exec(self, codeobj, namespace):
+        task = self.loop.run_in_executor(None, eval, codeobj, namespace)
+        if self.command_timeout:
+            task = asyncio.wait_for(task, self.command_timeout)
+        value = yield from task
+        return value
+
+
+def start_manhole(banner=None, host='127.0.0.1', port=None, path=None,
+        namespace=None, loop=None, threaded=False, command_timeout=5):
     if (port, path) == (None, None):
         raise ValueError('At least one of port or path must be given')
 
-    client_cb = InteractiveInterpreter(namespace or {}, banner)
+    if threaded:
+        interpreter_class = ThreadedInteractiveInterpreter
+    else:
+        interpreter_class = InteractiveInterpreter
+
+    client_cb = interpreter_class(
+        namespace=namespace or {}, banner=banner,
+        loop=loop or asyncio.get_event_loop(),
+        command_timeout=command_timeout)
 
     if path:
         f = asyncio.async(asyncio.start_unix_server(client_cb, path=path))
