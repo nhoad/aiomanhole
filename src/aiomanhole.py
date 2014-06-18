@@ -111,7 +111,7 @@ class InteractiveInterpreter:
                     if value is not None:
                         writer.write('{!r}\n'.format(value).encode('utf8'))
                         yield from writer.drain()
-                    namespace['_'] = value
+                        namespace['_'] = value
 
                 if stdout:
                     writer.write(stdout.encode('utf8'))
