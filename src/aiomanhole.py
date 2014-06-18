@@ -100,6 +100,7 @@ class InteractiveInterpreter:
                 continue
 
             if codeobj is None:
+                # partial compile, wait until next line
                 continue
             else:
                 try:
