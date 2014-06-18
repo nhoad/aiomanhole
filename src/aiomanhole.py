@@ -49,8 +49,10 @@ class InteractiveInterpreter:
 
     def attempt_compile(self, line):
         try:
+            # handle an expression which yields a value
             codeobj = self.compiler(line, symbol='eval')
         except SyntaxError:
+            # handle a statement which does not yield a value
             codeobj = self.compiler(b'')
         return codeobj
 
