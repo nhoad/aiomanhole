@@ -9,6 +9,9 @@ from codeop import CommandCompiler
 from io import BytesIO, StringIO
 
 
+__all__ = ['start_manhole']
+
+
 class StatefulCommandCompiler(CommandCompiler):
     """A command compiler that buffers input until a full command is available."""
 
