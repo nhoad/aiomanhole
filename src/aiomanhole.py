@@ -201,6 +201,8 @@ class ThreadedInteractiveInterpreter(InteractiveInterpreter):
 
 
 class InterpreterFactory:
+    """Factory class for creating interpreters."""
+
     def __init__(self, interpreter_class, *args, namespace=None, shared=False, **kwargs):
         self.interpreter_class = interpreter_class
         self.namespace = namespace or {}
@@ -270,5 +272,5 @@ def start_manhole(banner=None, host='127.0.0.1', port=None, path=None,
 
 
 if __name__ == '__main__':
-    start_manhole(path='/var/tmp/testing.manhole', banner='Well this is neat\n', shared=True)
+    start_manhole(path='/var/tmp/testing.manhole', banner='Well this is neat\n', threaded=True, shared=True)
     asyncio.get_event_loop().run_forever()
