@@ -3,7 +3,10 @@
 import os
 import sys
 
-from setuptools import setup
+try:
+    from distutils.core import setup
+except ImportError:
+    from setuptools import setup
 
 # Publish Helper.
 if sys.argv[-1] == 'publish':
@@ -12,7 +15,7 @@ if sys.argv[-1] == 'publish':
 
 settings = {
     'name': 'aiomanhole',
-    'version': '0.1',
+    'version': '0.1.1',
     'description': "Python module to provide a manhole in asyncio applications",
     'long_description': open('README.rst').read(),
     'author': 'Nathan Hoad',
