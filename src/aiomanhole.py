@@ -2,6 +2,7 @@ import asyncio
 import contextlib
 import functools
 import os
+import sys
 import traceback
 
 from codeop import CommandCompiler
@@ -9,6 +10,8 @@ from io import BytesIO, StringIO
 
 
 class StatefulCommandCompiler(CommandCompiler):
+    """A command compiler that buffers input until a full command is available."""
+
     def __init__(self):
         super().__init__()
         self.buf = BytesIO()
@@ -40,12 +43,14 @@ class StatefulCommandCompiler(CommandCompiler):
 
 
 class InteractiveInterpreter:
-    def __init__(self, namespace, banner, loop, command_timeout):
+    """An interactive asynchronous interpreter."""
+
+    def __init__(self, namespace, banner, loop):
         self.namespace = namespace
         self.banner = banner if isinstance(banner, bytes) else banner.encode('utf8')
+        # FIXME: this creates one compiler for all clients. That's bad!
         self.compiler = StatefulCommandCompiler()
         self.loop = loop
-        self.command_timeout = command_timeout
 
     def attempt_compile(self, line):
         try:
@@ -57,6 +62,7 @@ class InteractiveInterpreter:
         return codeobj
 
     def send_exception(self):
+        """When an exception has occurred, write the traceback to the user."""
         self.compiler.reset()
 
         exc = traceback.format_exc()
@@ -78,48 +84,85 @@ class InteractiveInterpreter:
 
     @asyncio.coroutine
     def handle_one_command(self, namespace):
-        reader = self.reader
+        """Process a single command. May have many lines."""
+        while True:
+            yield from self.write_prompt()
+            codeobj = yield from self.read_command()
+
+            if codeobj is not None:
+                yield from self.run_command(codeobj, namespace)
+
+    @asyncio.coroutine
+    def run_command(self, codeobj, namespace):
+        """Execute a compiled code object in a given namespace, and write the
+        output back to the client.
+        """
+        try:
+            value, stdout = yield from self.attempt_exec(codeobj, namespace)
+        except Exception:
+            yield from self.send_exception()
+            return
+        else:
+            if value is not None:
+                namespace['_'] = value
+            yield from self.send_output(value, stdout)
+
+    @asyncio.coroutine
+    def write_prompt(self):
         writer = self.writer
 
-        while True:
-            if self.compiler.is_partial_command():
-                writer.write(b'... ')
-            else:
-                writer.write(b'>>> ')
+        if self.compiler.is_partial_command():
+            writer.write(b'... ')
+        else:
+            writer.write(b'>>> ')
 
-            yield from writer.drain()
+        yield from writer.drain()
 
-            line = yield from reader.readline()
-            if line == b'':  # lost connection
-                break
+    @asyncio.coroutine
+    def read_command(self):
+        """Read a command from the user line by line.
 
-            try:
-                codeobj = self.attempt_compile(line)
-            except SyntaxError:
-                self.send_exception()
-                continue
+        Returns a code object suitable for execution.
+        """
 
-            if codeobj is None:
-                # partial compile, wait until next line
-                continue
-            else:
-                try:
-                    value, stdout = yield from self.attempt_exec(codeobj, namespace)
-                except Exception:
-                    yield from self.send_exception()
-                    continue
-                else:
-                    if value is not None:
-                        writer.write('{!r}\n'.format(value).encode('utf8'))
-                        yield from writer.drain()
-                        namespace['_'] = value
+        reader = self.reader
 
-                if stdout:
-                    writer.write(stdout.encode('utf8'))
-                    yield from writer.drain()
+        line = yield from reader.readline()
+        if line == b'':  # lost connection
+            raise ConnectionResetError()
+
+        try:
+            codeobj = self.attempt_compile(line)
+        except SyntaxError:
+            self.send_exception()
+            return
+
+        return codeobj
+
+    @asyncio.coroutine
+    def send_output(self, value, stdout):
+        """Write the output or value of the expression back to user.
+
+        >>> 5
+        5
+        >>> print('cash rules everything around me')
+        cash rules everything around me
+        """
+
+        writer = self.writer
+
+        if value is not None:
+            writer.write('{!r}\n'.format(value).encode('utf8'))
+
+        if stdout:
+            writer.write(stdout.encode('utf8'))
+
+        yield from writer.drain()
 
     @asyncio.coroutine
     def __call__(self, reader, writer):
+        """Main entry point for an interpreter session with a single client."""
+
         self.reader = reader
         self.writer = writer
 
@@ -137,11 +180,24 @@ class InteractiveInterpreter:
             except ConnectionResetError:
                 break
             except Exception as e:
-                import traceback
                 traceback.print_exc()
 
 
 class ThreadedInteractiveInterpreter(InteractiveInterpreter):
+    """An interactive asynchronous interpreter that executes
+    statements/expressions in a thread.
+
+    This is useful for aiding to protect against accidentally running
+    slow/terminal code in your main loop, which would destroy the process.
+
+    Also accepts a timeout, which defaults to five seconds. This won't kill
+    the running statement (good luck killing a thread) but it will at least
+    yield control back to the manhole.
+    """
+    def __init__(self, *args, command_timeout=5, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.command_timeout = command_timeout
+
     def _real_exec(self, codeobj, namespace):
         task = self.loop.run_in_executor(None, eval, codeobj, namespace)
         if self.command_timeout:
@@ -152,18 +208,34 @@ class ThreadedInteractiveInterpreter(InteractiveInterpreter):
 
 def start_manhole(banner=None, host='127.0.0.1', port=None, path=None,
         namespace=None, loop=None, threaded=False, command_timeout=5):
+
+    """Starts a manhole server on a given TCP and/or UNIX address.
+
+    Keyword arguments:
+        banner - Text to display when client initially connects.
+        host - interface to bind on.
+        port - port to listen on over TCP. Default is disabled.
+        path - filesystem path to listen on over UNIX sockets. Deafult is disabled.
+        namespace - dictionary namespace to provide to connected clients.
+        threaded - if True, use a threaded interpreter. False, run them in the
+                   middle of the event loop. See ThreadedInteractiveInterpreter
+                   for details.
+        command_timeout - timeout in seconds for commands. Only applies if
+                          `threaded` is True.
+    """
+
     if (port, path) == (None, None):
         raise ValueError('At least one of port or path must be given')
 
     if threaded:
-        interpreter_class = ThreadedInteractiveInterpreter
+        interpreter_class = functools.partial(
+            ThreadedInteractiveInterpreter, command_timeout=command_timeout)
     else:
         interpreter_class = InteractiveInterpreter
 
     client_cb = interpreter_class(
         namespace=namespace or {}, banner=banner,
-        loop=loop or asyncio.get_event_loop(),
-        command_timeout=command_timeout)
+        loop=loop or asyncio.get_event_loop())
 
     if path:
         f = asyncio.async(asyncio.start_unix_server(client_cb, path=path))
