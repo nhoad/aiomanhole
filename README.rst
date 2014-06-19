@@ -41,7 +41,7 @@ you to share the namespace between clients if you want.
 Can I specify what is available in the manhole?
 ===============================================
 Yes! When you call `start_manhole`, just pass along a dictionary of what you
-want to provide as the namespace parameter.
+want to provide as the namespace parameter::
 
     from aiomanhole import start_manhole
 
@@ -50,6 +50,7 @@ want to provide as the namespace parameter.
         'whatsit': application_state_whatsit,
         'None': 5,  # don't do this though
     })
+
 
 When should I use threaded=True?
 ================================
