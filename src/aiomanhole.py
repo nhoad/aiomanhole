@@ -48,7 +48,6 @@ class InteractiveInterpreter:
     def __init__(self, namespace, banner, loop):
         self.namespace = namespace
         self.banner = banner if isinstance(banner, bytes) else banner.encode('utf8')
-        # FIXME: this creates one compiler for all clients. That's bad!
         self.compiler = StatefulCommandCompiler()
         self.loop = loop
 
@@ -83,28 +82,27 @@ class InteractiveInterpreter:
         return eval(codeobj, namespace)
 
     @asyncio.coroutine
-    def handle_one_command(self, namespace):
+    def handle_one_command(self):
         """Process a single command. May have many lines."""
+
         while True:
             yield from self.write_prompt()
             codeobj = yield from self.read_command()
 
             if codeobj is not None:
-                yield from self.run_command(codeobj, namespace)
+                yield from self.run_command(codeobj)
 
     @asyncio.coroutine
-    def run_command(self, codeobj, namespace):
-        """Execute a compiled code object in a given namespace, and write the
-        output back to the client.
-        """
+    def run_command(self, codeobj):
+        """Execute a compiled code object, and write the output back to the client."""
         try:
-            value, stdout = yield from self.attempt_exec(codeobj, namespace)
+            value, stdout = yield from self.attempt_exec(codeobj, self.namespace)
         except Exception:
             yield from self.send_exception()
             return
         else:
             if value is not None:
-                namespace['_'] = value
+                self.namespace['_'] = value
             yield from self.send_output(value, stdout)
 
     @asyncio.coroutine
@@ -170,13 +168,9 @@ class InteractiveInterpreter:
             writer.write(self.banner)
             yield from writer.drain()
 
-        # one namespace per client, in case whole teams decide to congregate in
-        # a single process.
-        namespace = dict(self.namespace)
-
         while True:
             try:
-                yield from self.handle_one_command(namespace)
+                yield from self.handle_one_command()
             except ConnectionResetError:
                 break
             except Exception as e:
@@ -206,8 +200,26 @@ class ThreadedInteractiveInterpreter(InteractiveInterpreter):
         return value
 
 
+class InterpreterFactory:
+    def __init__(self, interpreter_class, *args, namespace=None, shared=False, **kwargs):
+        self.interpreter_class = interpreter_class
+        self.namespace = namespace or {}
+        self.shared = shared
+        self.args = args
+        self.kwargs = kwargs
+
+    def __call__(self, reader, writer):
+        interpreter = self.interpreter_class(
+            *self.args,
+            namespace=self.namespace if self.shared else dict(self.namespace),
+            **self.kwargs
+        )
+        asyncio.async(interpreter(reader, writer))
+
+
 def start_manhole(banner=None, host='127.0.0.1', port=None, path=None,
-        namespace=None, loop=None, threaded=False, command_timeout=5):
+        namespace=None, loop=None, threaded=False, command_timeout=5,
+        shared=False):
 
     """Starts a manhole server on a given TCP and/or UNIX address.
 
@@ -222,6 +234,7 @@ def start_manhole(banner=None, host='127.0.0.1', port=None, path=None,
                    for details.
         command_timeout - timeout in seconds for commands. Only applies if
                           `threaded` is True.
+        shared - If True, share a single namespace between all clients.
     """
 
     if (port, path) == (None, None):
@@ -233,8 +246,8 @@ def start_manhole(banner=None, host='127.0.0.1', port=None, path=None,
     else:
         interpreter_class = InteractiveInterpreter
 
-    client_cb = interpreter_class(
-        namespace=namespace or {}, banner=banner,
+    client_cb = InterpreterFactory(interpreter_class,
+        shared=shared, namespace=namespace, banner=banner,
         loop=loop or asyncio.get_event_loop())
 
     if path:
@@ -257,5 +270,5 @@ def start_manhole(banner=None, host='127.0.0.1', port=None, path=None,
 
 
 if __name__ == '__main__':
-    start_manhole(path='/var/tmp/testing.manhole', banner='Well this is neat\n')
+    start_manhole(path='/var/tmp/testing.manhole', banner='Well this is neat\n', shared=True)
     asyncio.get_event_loop().run_forever()
