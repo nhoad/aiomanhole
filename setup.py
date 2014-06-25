@@ -20,7 +20,7 @@ settings = {
     'long_description': open('README.rst').read(),
     'author': 'Nathan Hoad',
     'author_email': 'nathan@getoffmalawn.com',
-    'url': 'https://bitbucket.org/getoffmalawn/aiomanhole',
+    'url': 'https://github.com/nathan-hoad/aiomanhole',
     'license': 'BSD (3-clause)',
     'classifiers': [
         # 'Development Status :: 5 - Production/Stable',
