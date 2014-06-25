@@ -23,16 +23,13 @@ class StatefulCommandCompiler(CommandCompiler):
         return bool(self.buf.getvalue())
 
     def __call__(self, source, **kwargs):
-        self.buf.write(source)
+        buf = self.buf
+        if self.is_partial_command():
+            buf.write(b'\n')
+        buf.write(source)
 
         code = self.buf.getvalue().decode('utf8')
         cleaned_code = code.replace('\r', '')
-
-        # this is disgusting. Surely there must be a better way of handling
-        # multiline functions.
-        if (cleaned_code.startswith(('class ', 'def ')) and
-                not cleaned_code.endswith('\n\n')):
-            return
 
         codeobj = super().__call__(code, **kwargs)
 
@@ -55,12 +52,7 @@ class InteractiveInterpreter:
         self.loop = loop
 
     def attempt_compile(self, line):
-        try:
-            # handle an expression which yields a value
-            codeobj = self.compiler(line, symbol='eval')
-        except SyntaxError:
-            # handle a statement which does not yield a value
-            codeobj = self.compiler(b'')
+        codeobj = self.compiler(line)
         return codeobj
 
     def send_exception(self):
@@ -104,8 +96,6 @@ class InteractiveInterpreter:
             yield from self.send_exception()
             return
         else:
-            if value is not None:
-                self.namespace['_'] = value
             yield from self.send_output(value, stdout)
 
     @asyncio.coroutine
@@ -133,7 +123,8 @@ class InteractiveInterpreter:
             raise ConnectionResetError()
 
         try:
-            codeobj = self.attempt_compile(line)
+            # skip the newline to make CommandCompiler work as advertised
+            codeobj = self.attempt_compile(line.rstrip(b'\n'))
         except SyntaxError:
             self.send_exception()
             return

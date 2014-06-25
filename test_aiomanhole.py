@@ -54,9 +54,11 @@ class TestStatefulCommandCompiler:
         eval(f, ns)
         assert ns['f'] == 5
 
-        f = compiler(b'5', symbol='eval')
+        f = compiler(b'5')
         assert f is not None
-        assert eval(f, {}) == 5
+        eval(f, {})
+
+        assert __builtins__['_'] == 5
 
         assert compiler(b'import asyncio') is not None
 
