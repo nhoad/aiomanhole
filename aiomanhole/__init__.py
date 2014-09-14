@@ -47,9 +47,19 @@ class InteractiveInterpreter:
 
     def __init__(self, namespace, banner, loop):
         self.namespace = namespace
-        self.banner = banner if isinstance(banner, bytes) else banner.encode('utf8')
+        self.banner = self.get_banner(banner)
         self.compiler = StatefulCommandCompiler()
         self.loop = loop
+
+    def get_banner(self, banner):
+        if isinstance(banner, bytes):
+            return banner
+        elif isinstance(banner, str):
+            return banner.encode('utf8')
+        elif banner is None:
+            return b''
+        else:
+            raise ValueError("Cannot handle unknown banner type {!}, expected str or bytes".format(banner.__class__.__name__))
 
     def attempt_compile(self, line):
         codeobj = self.compiler(line)

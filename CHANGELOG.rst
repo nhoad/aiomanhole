@@ -1,6 +1,9 @@
 Change History
 ==============
 
+0.2.1 (14th September 2014)
+ - Handle a banner of None.
+
 0.2.0 (25th June 2014)
  - Handle multiline statements much better.
  - setup.py pointed to wrong domain for project URL

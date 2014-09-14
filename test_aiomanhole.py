@@ -139,6 +139,18 @@ class TestStatefulCommandCompiler:
 
 
 class TestInteractiveInterpreter:
+    @pytest.mark.parametrize('banner,expected_result', [
+        (b'straight up bytes', b'straight up bytes'),
+        ('dat unicode tho', b'dat unicode tho'),
+        (None, b''),
+        (object(), ValueError),
+    ])
+    def test_get_banner(self, banner, expected_result, interpreter):
+        if isinstance(expected_result, type) and issubclass(expected_result, Exception):
+            pytest.raises(expected_result, interpreter.get_banner, banner)
+        else:
+            assert interpreter.get_banner(banner) == expected_result
+
     @pytest.mark.parametrize('partial', [True, False])
     def test_write_prompt(self, interpreter, loop, partial):
         with mock.patch.object(interpreter.compiler, 'is_partial_command', return_value=partial):
