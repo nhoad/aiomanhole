@@ -196,10 +196,11 @@ class ThreadedInteractiveInterpreter(InteractiveInterpreter):
         super().__init__(*args, **kwargs)
         self.command_timeout = command_timeout
 
+    @asyncio.coroutine
     def _real_exec(self, codeobj, namespace):
         task = self.loop.run_in_executor(None, eval, codeobj, namespace)
         if self.command_timeout:
-            task = asyncio.wait_for(task, self.command_timeout)
+            task = asyncio.wait_for(task, self.command_timeout, loop=self.loop)
         value = yield from task
         return value
 
@@ -207,20 +208,22 @@ class ThreadedInteractiveInterpreter(InteractiveInterpreter):
 class InterpreterFactory:
     """Factory class for creating interpreters."""
 
-    def __init__(self, interpreter_class, *args, namespace=None, shared=False, **kwargs):
+    def __init__(self, interpreter_class, *args, namespace=None, shared=False, loop=None, **kwargs):
         self.interpreter_class = interpreter_class
         self.namespace = namespace or {}
         self.shared = shared
         self.args = args
         self.kwargs = kwargs
+        self.loop = loop or asyncio.get_event_loop()
 
     def __call__(self, reader, writer):
         interpreter = self.interpreter_class(
             *self.args,
+            loop=self.loop,
             namespace=self.namespace if self.shared else dict(self.namespace),
             **self.kwargs
         )
-        asyncio.async(interpreter(reader, writer))
+        return asyncio.async(interpreter(reader, writer), loop=self.loop)
 
 
 def start_manhole(banner=None, host='127.0.0.1', port=None, path=None,
@@ -243,6 +246,8 @@ def start_manhole(banner=None, host='127.0.0.1', port=None, path=None,
         shared - If True, share a single namespace between all clients.
     """
 
+    loop = loop or asyncio.get_event_loop()
+
     if (port, path) == (None, None):
         raise ValueError('At least one of port or path must be given')
 
@@ -252,12 +257,12 @@ def start_manhole(banner=None, host='127.0.0.1', port=None, path=None,
     else:
         interpreter_class = InteractiveInterpreter
 
-    client_cb = InterpreterFactory(interpreter_class,
-        shared=shared, namespace=namespace, banner=banner,
-        loop=loop or asyncio.get_event_loop())
+    client_cb = InterpreterFactory(
+        interpreter_class, shared=shared, namespace=namespace, banner=banner,
+        loop=loop)
 
     if path:
-        f = asyncio.async(asyncio.start_unix_server(client_cb, path=path))
+        f = asyncio.async(asyncio.start_unix_server(client_cb, path=path, loop=loop))
 
         @f.add_done_callback
         def done(task):
@@ -272,7 +277,8 @@ def start_manhole(banner=None, host='127.0.0.1', port=None, path=None,
                 atexit.register(remove_manhole)
 
     if port:
-        asyncio.async(asyncio.start_server(client_cb, host=host, port=port))
+        asyncio.async(asyncio.start_server(
+            client_cb, host=host, port=port, loop=loop), loop=loop)
 
 
 if __name__ == '__main__':
