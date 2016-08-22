@@ -1,8 +1,6 @@
 import asyncio
 import contextlib
 import functools
-import os
-import sys
 import traceback
 
 from codeop import CommandCompiler
@@ -266,20 +264,7 @@ def start_manhole(banner=None, host='127.0.0.1', port=None, path=None,
 
     if path:
         f = asyncio.async(asyncio.start_unix_server(client_cb, path=path, loop=loop))
-
         coros.append(f)
-
-        @f.add_done_callback
-        def done(task):
-            def remove_manhole():
-                try:
-                    os.unlink(path)
-                except OSError:
-                    pass
-
-            if task.exception() is None:
-                import atexit
-                atexit.register(remove_manhole)
 
     if port:
         f = asyncio.async(asyncio.start_server(
