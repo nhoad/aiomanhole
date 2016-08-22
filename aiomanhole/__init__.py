@@ -244,6 +244,8 @@ def start_manhole(banner=None, host='127.0.0.1', port=None, path=None,
         command_timeout - timeout in seconds for commands. Only applies if
                           `threaded` is True.
         shared - If True, share a single namespace between all clients.
+
+    Returns a Future for starting the server(s).
     """
 
     loop = loop or asyncio.get_event_loop()
@@ -261,8 +263,12 @@ def start_manhole(banner=None, host='127.0.0.1', port=None, path=None,
         interpreter_class, shared=shared, namespace=namespace, banner=banner,
         loop=loop)
 
+    coros = []
+
     if path:
         f = asyncio.async(asyncio.start_unix_server(client_cb, path=path, loop=loop))
+
+        coros.append(f)
 
         @f.add_done_callback
         def done(task):
@@ -277,8 +283,11 @@ def start_manhole(banner=None, host='127.0.0.1', port=None, path=None,
                 atexit.register(remove_manhole)
 
     if port:
-        asyncio.async(asyncio.start_server(
+        f = asyncio.async(asyncio.start_server(
             client_cb, host=host, port=port, loop=loop), loop=loop)
+        coros.append(f)
+
+    return asyncio.gather(*coros, loop=loop)
 
 
 if __name__ == '__main__':
