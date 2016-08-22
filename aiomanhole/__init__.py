@@ -29,7 +29,6 @@ class StatefulCommandCompiler(CommandCompiler):
         buf.write(source)
 
         code = self.buf.getvalue().decode('utf8')
-        cleaned_code = code.replace('\r', '')
 
         codeobj = super().__call__(code, **kwargs)
 
