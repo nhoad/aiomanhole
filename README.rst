@@ -38,6 +38,31 @@ The package provides both a threaded and non-threaded interpreter, and allows
 you to share the namespace between clients if you want.
 
 
+I'm getting "Address is already in use" when I start! Help!
+===========================================================
+
+Unlike regular TCP/UDP sockets, UNIX domain sockets are entries in the
+filesystem. When your process shuts down, the UNIX socket that is created is
+not cleaned up. What this means is that when your application starts up again,
+it will attempt to bind a UNIX socket to that path again and fail, as it is
+already present (it's "already in use").
+
+The standard approach to working with UNIX sockets is to delete them before you try to bind to it again, for example::
+
+    import os
+    try:
+        os.unlink('/path/to/my.manhole')
+    except FileNotFoundError:
+        pass
+    start_manhole('/path/to/my.manhole')
+
+
+You may be tempted to try and clean up the socket on shutdown, but don't. What
+if your application crashes? What if your computer loses power? There are lots
+of things that can go wrong, and hoping the previous run was successful, while
+admirably positive, is not something you can do.
+
+
 Can I specify what is available in the manhole?
 ===============================================
 Yes! When you call `start_manhole`, just pass along a dictionary of what you
