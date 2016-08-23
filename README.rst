@@ -47,7 +47,8 @@ not cleaned up. What this means is that when your application starts up again,
 it will attempt to bind a UNIX socket to that path again and fail, as it is
 already present (it's "already in use").
 
-The standard approach to working with UNIX sockets is to delete them before you try to bind to it again, for example::
+The standard approach to working with UNIX sockets is to delete them before you
+try to bind to it again, for example::
 
     import os
     try:
