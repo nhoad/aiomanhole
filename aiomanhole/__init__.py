@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 import functools
+import sys
 import traceback
 
 from codeop import CommandCompiler
@@ -110,9 +111,9 @@ class InteractiveInterpreter:
         writer = self.writer
 
         if self.compiler.is_partial_command():
-            writer.write(b'... ')
+            writer.write(sys.ps2)
         else:
-            writer.write(b'>>> ')
+            writer.write(sys.ps1)
 
         yield from writer.drain()
 
@@ -158,12 +159,24 @@ class InteractiveInterpreter:
 
         yield from writer.drain()
 
+    def _setup_prompts(self):
+        try:
+            sys.ps1
+        except AttributeError:
+            sys.ps1 = ">>> "
+        try:
+            sys.ps2
+        except AttributeError:
+            sys.ps2 = "... "
+
     @asyncio.coroutine
     def __call__(self, reader, writer):
         """Main entry point for an interpreter session with a single client."""
 
         self.reader = reader
         self.writer = writer
+
+        self._setup_prompts()
 
         if self.banner:
             writer.write(self.banner)
