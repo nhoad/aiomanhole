@@ -60,8 +60,7 @@ class InteractiveInterpreter:
             raise ValueError("Cannot handle unknown banner type {!}, expected str or bytes".format(banner.__class__.__name__))
 
     def attempt_compile(self, line):
-        codeobj = self.compiler(line)
-        return codeobj
+        return self.compiler(line)
 
     def send_exception(self):
         """When an exception has occurred, write the traceback to the user."""
