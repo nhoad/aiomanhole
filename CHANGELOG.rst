@@ -1,6 +1,9 @@
 Change History
 ==============
 
+0.4.0 (3rd March 2017)
+ - Ensure actual syntax errors get reported to the client.
+
 0.3.0 (23rd August 2016)
  - **Behaviour change** aiomanhole no longer attempts to remove the UNIX socket
    on shutdown. This was flakey behaviour and does not match best practice

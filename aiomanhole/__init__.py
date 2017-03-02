@@ -62,6 +62,7 @@ class InteractiveInterpreter:
     def attempt_compile(self, line):
         return self.compiler(line)
 
+    @asyncio.coroutine
     def send_exception(self):
         """When an exception has occurred, write the traceback to the user."""
         self.compiler.reset()
@@ -133,7 +134,7 @@ class InteractiveInterpreter:
             # skip the newline to make CommandCompiler work as advertised
             codeobj = self.attempt_compile(line.rstrip(b'\n'))
         except SyntaxError:
-            self.send_exception()
+            yield from self.send_exception()
             return
 
         return codeobj
