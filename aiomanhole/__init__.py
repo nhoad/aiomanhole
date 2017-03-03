@@ -186,6 +186,7 @@ class InteractiveInterpreter:
             try:
                 yield from self.handle_one_command()
             except ConnectionResetError:
+                writer.close()
                 break
             except Exception as e:
                 traceback.print_exc()
