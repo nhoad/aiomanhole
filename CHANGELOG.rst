@@ -1,6 +1,9 @@
 Change History
 ==============
 
+0.4.1 (3rd March 2017)
+ - Ensure prompts are bytes, broken in 0.4.0.
+
 0.4.0 (3rd March 2017)
  - Ensure actual syntax errors get reported to the client.
 

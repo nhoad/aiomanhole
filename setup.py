@@ -15,7 +15,7 @@ if sys.argv[-1] == 'publish':
 
 settings = {
     'name': 'aiomanhole',
-    'version': '0.4.0',
+    'version': '0.4.1',
     'description': "Python module to provide a manhole in asyncio applications",
     'long_description': '\n\n'.join([open('README.rst').read(), open('CHANGELOG.rst').read()]),
     'author': 'Nathan Hoad',

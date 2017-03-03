@@ -111,9 +111,9 @@ class InteractiveInterpreter:
         writer = self.writer
 
         if self.compiler.is_partial_command():
-            writer.write(sys.ps2)
+            writer.write(sys.ps2.encode('utf8'))
         else:
-            writer.write(sys.ps1)
+            writer.write(sys.ps1.encode('utf8'))
 
         yield from writer.drain()
 
