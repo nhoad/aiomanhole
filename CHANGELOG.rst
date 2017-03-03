@@ -1,6 +1,10 @@
 Change History
 ==============
 
+0.4.2 (3rd March 2017)
+ - Handle clients putting the socket into a half-closed state when an EOF
+   occurs.
+
 0.4.1 (3rd March 2017)
  - Ensure prompts are bytes, broken in 0.4.0.
 
