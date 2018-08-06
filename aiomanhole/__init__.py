@@ -234,7 +234,7 @@ class InterpreterFactory:
             namespace=self.namespace if self.shared else dict(self.namespace),
             **self.kwargs
         )
-        return asyncio.async(interpreter(reader, writer), loop=self.loop)
+        return asyncio.ensure_future(interpreter(reader, writer), loop=self.loop)
 
 
 def start_manhole(banner=None, host='127.0.0.1', port=None, path=None,
