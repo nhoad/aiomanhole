@@ -1,6 +1,10 @@
 Change History
 ==============
 
+0.5.0 (6th August 2018)
+ - Fix syntax error in 3.7
+ - Drop 3.4 support.
+
 0.4.2 (3rd March 2017)
  - Handle clients putting the socket into a half-closed state when an EOF
    occurs.

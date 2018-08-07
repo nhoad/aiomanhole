@@ -15,7 +15,7 @@ if sys.argv[-1] == 'publish':
 
 settings = {
     'name': 'aiomanhole',
-    'version': '0.4.2',
+    'version': '0.5.0',
     'description': "Python module to provide a manhole in asyncio applications",
     'long_description': '\n\n'.join([open('README.rst').read(), open('CHANGELOG.rst').read()]),
     'author': 'Nathan Hoad',
@@ -28,10 +28,9 @@ settings = {
         'Natural Language :: English',
         'License :: OSI Approved :: BSD License',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.3',
-        'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
     ],
     'packages': ['aiomanhole']
 }
