@@ -1,4 +1,8 @@
 import asyncio
+from contextlib import contextmanager
+import os
+import shutil
+import tempfile
 
 from io import BytesIO
 from unittest import mock
@@ -28,22 +32,35 @@ def loop():
     asyncio.set_event_loop(None)
     return loop
 
-
-@pytest.fixture(scope='function')
-def port(loop):
+@contextmanager
+def tcp_server(loop):
     (server,) = loop.run_until_complete(start_manhole(port=0, loop=loop))
     (socket,) = server.sockets
     (ip, port) = socket.getsockname()
 
-    yield port
+    yield loop.run_until_complete(asyncio.open_connection('127.0.0.1', port, loop=loop))
 
     server.close()
     loop.run_until_complete(server.wait_closed())
 
+@contextmanager
+def unix_server(loop):
+    directory = tempfile.mkdtemp()
 
-async def tcp_send_command(message, port, loop):
-    reader, writer = await asyncio.open_connection('127.0.0.1', port,
-                                                   loop=loop)
+    try:
+        domain_socket = os.path.join(directory, 'aiomanhole')
+        (server,) = loop.run_until_complete(start_manhole(path=domain_socket, loop=loop))
+
+        yield loop.run_until_complete(asyncio.open_unix_connection(path=domain_socket, loop=loop))
+
+        server.close()
+        loop.run_until_complete(server.wait_closed())
+
+    finally:
+        shutil.rmtree(directory)
+
+
+async def send_command(message, reader, writer, loop):
     # Prompt on connect
     assert await reader.read(4) == b'>>> '
 
@@ -220,6 +237,8 @@ class TestInteractiveInterpreter:
         (b'print("hello")', b'hello'),
         (b'101', b'101'),
     ])
-    def test_command_over_localhost_network(self, loop, port, stdin, expected_output):
-        output = loop.run_until_complete(tcp_send_command(stdin + b'\n', port, loop))
-        assert output == expected_output
+    @pytest.mark.parametrize('server_factory', [tcp_server, unix_server])
+    def test_command_over_localhost_network(self, loop, server_factory, stdin, expected_output):
+        with server_factory(loop=loop) as (reader, writer):
+            output = loop.run_until_complete(send_command(stdin + b'\n', reader, writer, loop))
+            assert output == expected_output
