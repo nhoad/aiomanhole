@@ -5,7 +5,7 @@ from unittest import mock
 
 import pytest
 
-from aiomanhole import StatefulCommandCompiler, InteractiveInterpreter
+from aiomanhole import StatefulCommandCompiler, InteractiveInterpreter, start_manhole
 
 
 @pytest.fixture(scope='function')
@@ -24,7 +24,37 @@ def interpreter(loop):
 
 @pytest.fixture(scope='function')
 def loop():
-    return asyncio.get_event_loop()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(None)
+    return loop
+
+
+@pytest.fixture(scope='function')
+def port(loop):
+    (server,) = loop.run_until_complete(start_manhole(port=0, loop=loop))
+    (socket,) = server.sockets
+    (ip, port) = socket.getsockname()
+
+    yield port
+
+    server.close()
+    loop.run_until_complete(server.wait_closed())
+
+
+async def tcp_send_command(message, port, loop):
+    reader, writer = await asyncio.open_connection('127.0.0.1', port,
+                                                   loop=loop)
+    # Prompt on connect
+    assert await reader.read(4) == b'>>> '
+
+    # Send message
+    writer.write(message)
+
+    # Read until we see the next prompt, then strip off the prompt
+    prompt = b'\n>>>'
+    response = await reader.readuntil(separator=prompt)
+    writer.close()
+    return response[:-len(prompt)]
 
 
 class MockStream:
@@ -184,4 +214,12 @@ class TestInteractiveInterpreter:
         loop.run_until_complete(interpreter.send_output(value, stdout))
 
         output = interpreter.writer.buf.getvalue()
+        assert output == expected_output
+
+    @pytest.mark.parametrize('stdin,expected_output', [
+        (b'print("hello")', b'hello'),
+        (b'101', b'101'),
+    ])
+    def test_command_over_localhost_network(self, loop, port, stdin, expected_output):
+        output = loop.run_until_complete(tcp_send_command(stdin + b'\n', port, loop))
         assert output == expected_output
