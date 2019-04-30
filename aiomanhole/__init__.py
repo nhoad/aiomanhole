@@ -278,10 +278,10 @@ def start_manhole(banner=None, host='127.0.0.1', port=None, path=None,
 
     if path:
         f = asyncio.ensure_future(
-            asyncio.start_unix_server(client_cb, path=path, loop=loop))
+            asyncio.start_unix_server(client_cb, path=path, loop=loop), loop=loop)
         coros.append(f)
 
-    if port:
+    if port is not None:
         f = asyncio.ensure_future(asyncio.start_server(
             client_cb, host=host, port=port, loop=loop), loop=loop)
         coros.append(f)
