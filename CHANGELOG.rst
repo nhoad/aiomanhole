@@ -1,6 +1,10 @@
 Change History
 ==============
 
+0.6.0 (30th April 2019)
+ - Don't use the global loop. Thanks Timothy Fitz!
+ - Allow a port of 0. Thanks Timothy Fitz!
+
 0.5.0 (6th August 2018)
  - Fix syntax error in 3.7
  - Drop 3.4 support.
