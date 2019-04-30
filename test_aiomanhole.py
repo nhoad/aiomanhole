@@ -201,7 +201,8 @@ class TestInteractiveInterpreter:
     @pytest.mark.parametrize('partial', [True, False])
     def test_write_prompt(self, interpreter, loop, partial):
         with mock.patch.object(interpreter.compiler, 'is_partial_command', return_value=partial):
-            loop.run_until_complete(interpreter.write_prompt())
+            with mock.patch('sys.ps1', '>>> ', create=True), mock.patch('sys.ps2', '... ', create=True):
+                loop.run_until_complete(interpreter.write_prompt())
 
         expected_value = b'... ' if partial else b'>>> '
         assert interpreter.writer.buf.getvalue() == expected_value
