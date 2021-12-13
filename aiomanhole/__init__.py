@@ -8,7 +8,7 @@ from codeop import CommandCompiler
 from io import BytesIO, StringIO
 
 
-__all__ = ['start_manhole']
+__all__ = ["start_manhole"]
 
 
 class StatefulCommandCompiler(CommandCompiler):
@@ -24,10 +24,10 @@ class StatefulCommandCompiler(CommandCompiler):
     def __call__(self, source, **kwargs):
         buf = self.buf
         if self.is_partial_command():
-            buf.write(b'\n')
+            buf.write(b"\n")
         buf.write(source)
 
-        code = self.buf.getvalue().decode('utf8')
+        code = self.buf.getvalue().decode("utf8")
 
         codeobj = super().__call__(code, **kwargs)
 
@@ -53,11 +53,15 @@ class InteractiveInterpreter:
         if isinstance(banner, bytes):
             return banner
         elif isinstance(banner, str):
-            return banner.encode('utf8')
+            return banner.encode("utf8")
         elif banner is None:
-            return b''
+            return b""
         else:
-            raise ValueError("Cannot handle unknown banner type {!}, expected str or bytes".format(banner.__class__.__name__))
+            raise ValueError(
+                "Cannot handle unknown banner type {!}, expected str or bytes".format(
+                    banner.__class__.__name__
+                )
+            )
 
     def attempt_compile(self, line):
         return self.compiler(line)
@@ -67,7 +71,7 @@ class InteractiveInterpreter:
         self.compiler.reset()
 
         exc = traceback.format_exc()
-        self.writer.write(exc.encode('utf8'))
+        self.writer.write(exc.encode("utf8"))
 
         await self.writer.drain()
 
@@ -104,9 +108,9 @@ class InteractiveInterpreter:
         writer = self.writer
 
         if self.compiler.is_partial_command():
-            writer.write(sys.ps2.encode('utf8'))
+            writer.write(sys.ps2.encode("utf8"))
         else:
-            writer.write(sys.ps1.encode('utf8'))
+            writer.write(sys.ps1.encode("utf8"))
 
         await writer.drain()
 
@@ -119,12 +123,12 @@ class InteractiveInterpreter:
         reader = self.reader
 
         line = await reader.readline()
-        if line == b'':  # lost connection
+        if line == b"":  # lost connection
             raise ConnectionResetError()
 
         try:
             # skip the newline to make CommandCompiler work as advertised
-            codeobj = self.attempt_compile(line.rstrip(b'\n'))
+            codeobj = self.attempt_compile(line.rstrip(b"\n"))
         except SyntaxError:
             await self.send_exception()
             return
@@ -143,10 +147,10 @@ class InteractiveInterpreter:
         writer = self.writer
 
         if value is not None:
-            writer.write('{!r}\n'.format(value).encode('utf8'))
+            writer.write("{!r}\n".format(value).encode("utf8"))
 
         if stdout:
-            writer.write(stdout.encode('utf8'))
+            writer.write(stdout.encode("utf8"))
 
         await writer.drain()
 
@@ -193,6 +197,7 @@ class ThreadedInteractiveInterpreter(InteractiveInterpreter):
     the running statement (good luck killing a thread) but it will at least
     yield control back to the manhole.
     """
+
     def __init__(self, *args, command_timeout=5, **kwargs):
         super().__init__(*args, **kwargs)
         self.command_timeout = command_timeout
@@ -208,7 +213,15 @@ class ThreadedInteractiveInterpreter(InteractiveInterpreter):
 class InterpreterFactory:
     """Factory class for creating interpreters."""
 
-    def __init__(self, interpreter_class, *args, namespace=None, shared=False, loop=None, **kwargs):
+    def __init__(
+        self,
+        interpreter_class,
+        *args,
+        namespace=None,
+        shared=False,
+        loop=None,
+        **kwargs
+    ):
         self.interpreter_class = interpreter_class
         self.namespace = namespace or {}
         self.shared = shared
@@ -226,9 +239,17 @@ class InterpreterFactory:
         return asyncio.ensure_future(interpreter(reader, writer), loop=self.loop)
 
 
-def start_manhole(banner=None, host='127.0.0.1', port=None, path=None,
-        namespace=None, loop=None, threaded=False, command_timeout=5,
-        shared=False):
+def start_manhole(
+    banner=None,
+    host="127.0.0.1",
+    port=None,
+    path=None,
+    namespace=None,
+    loop=None,
+    threaded=False,
+    command_timeout=5,
+    shared=False,
+):
 
     """Starts a manhole server on a given TCP and/or UNIX address.
 
@@ -251,35 +272,44 @@ def start_manhole(banner=None, host='127.0.0.1', port=None, path=None,
     loop = loop or asyncio.get_event_loop()
 
     if (port, path) == (None, None):
-        raise ValueError('At least one of port or path must be given')
+        raise ValueError("At least one of port or path must be given")
 
     if threaded:
         interpreter_class = functools.partial(
-            ThreadedInteractiveInterpreter, command_timeout=command_timeout)
+            ThreadedInteractiveInterpreter, command_timeout=command_timeout
+        )
     else:
         interpreter_class = InteractiveInterpreter
 
     client_cb = InterpreterFactory(
-        interpreter_class, shared=shared, namespace=namespace, banner=banner,
-        loop=loop)
+        interpreter_class, shared=shared, namespace=namespace, banner=banner, loop=loop
+    )
 
     coros = []
 
     if path:
         f = asyncio.ensure_future(
-            asyncio.start_unix_server(client_cb, path=path), loop=loop)
+            asyncio.start_unix_server(client_cb, path=path), loop=loop
+        )
         coros.append(f)
 
     if port is not None:
-        f = asyncio.ensure_future(asyncio.start_server(
-            client_cb, host=host, port=port), loop=loop)
+        f = asyncio.ensure_future(
+            asyncio.start_server(client_cb, host=host, port=port), loop=loop
+        )
         coros.append(f)
 
     return asyncio.gather(*coros)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    start_manhole(path='/var/tmp/testing.manhole', banner='Well this is neat\n', threaded=True, shared=True, loop = loop)
+    start_manhole(
+        path="/var/tmp/testing.manhole",
+        banner="Well this is neat\n",
+        threaded=True,
+        shared=True,
+        loop=loop,
+    )
     loop.run_forever()
