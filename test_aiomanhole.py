@@ -38,7 +38,7 @@ def tcp_server(loop):
     (socket,) = server.sockets
     (ip, port) = socket.getsockname()
 
-    yield loop.run_until_complete(asyncio.open_connection('127.0.0.1', port, loop=loop))
+    yield loop.run_until_complete(asyncio.open_connection('127.0.0.1', port))
 
     server.close()
     loop.run_until_complete(server.wait_closed())
@@ -51,7 +51,7 @@ def unix_server(loop):
         domain_socket = os.path.join(directory, 'aiomanhole')
         (server,) = loop.run_until_complete(start_manhole(path=domain_socket, loop=loop))
 
-        yield loop.run_until_complete(asyncio.open_unix_connection(path=domain_socket, loop=loop))
+        yield loop.run_until_complete(asyncio.open_unix_connection(path=domain_socket))
 
         server.close()
         loop.run_until_complete(server.wait_closed())
@@ -81,14 +81,10 @@ class MockStream:
     def write(self, data):
         self.buf.write(data)
 
-    @asyncio.coroutine
-    def drain(self):
-        yield
+    async def drain(self):
         pass
 
-    @asyncio.coroutine
-    def readline(self):
-        yield
+    async def readline(self):
         self.buf.seek(0)
         return self.buf.readline()
 
