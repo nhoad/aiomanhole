@@ -1,14 +1,6 @@
 #!/usr/bin/env python2
 
-import os
-import sys
-
 from setuptools import setup
-
-# Publish Helper.
-if sys.argv[-1] == "publish":
-    os.system("python3 setup.py sdist upload")
-    sys.exit()
 
 settings = {
     "name": "aiomanhole",
