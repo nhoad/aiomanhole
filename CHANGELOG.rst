@@ -1,6 +1,10 @@
 Change History
 ==============
 
+0.7.0 (23rd January 2022)
+ - Added support for Python 3.10. Thank you to Peter Bábics for contributing this!
+ - Removed support for Python 3.5.
+
 0.6.0 (30th April 2019)
  - Don't use the global loop. Thanks Timothy Fitz!
  - Allow a port of 0. Thanks Timothy Fitz!
