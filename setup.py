@@ -18,7 +18,7 @@ settings = {
         [open("README.rst").read(), open("CHANGELOG.rst").read()]
     ),
     "author": "Nathan Hoad",
-    "author_email": "nathan@getoffmalawn.com",
+    "author_email": "nathan@hoad.io",
     "url": "https://github.com/nathan-hoad/aiomanhole",
     "license": "BSD (3-clause)",
     "classifiers": [
